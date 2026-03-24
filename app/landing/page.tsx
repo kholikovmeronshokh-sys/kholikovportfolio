@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { storage } from '@/lib/storage'
 
 export default function Landing() {
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState<any[]>([])
 
   useEffect(() => {
     const data = storage.getProjects().slice(0, 6)

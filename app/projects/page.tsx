@@ -7,7 +7,7 @@ import Masonry from 'react-masonry-css'
 import { storage } from '@/lib/storage'
 
 export default function Projects() {
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 

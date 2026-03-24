@@ -9,7 +9,7 @@ export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
   const [formData, setFormData] = useState({

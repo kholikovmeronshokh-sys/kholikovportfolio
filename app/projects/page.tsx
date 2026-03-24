@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import Masonry from 'react-masonry-css'
-import { storage } from '@/lib/storage'
 
 export default function Projects() {
   const [projects, setProjects] = useState<any[]>([])
@@ -12,9 +11,12 @@ export default function Projects() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const data = storage.getProjects()
-    setProjects(data)
-    setLoading(false)
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => {
+        setProjects(data)
+        setLoading(false)
+      })
   }, [])
 
   const filteredProjects = projects.filter((project: any) =>
@@ -103,9 +105,9 @@ export default function Projects() {
                           onMouseEnter={(e) => e.currentTarget.play()}
                           onMouseLeave={(e) => e.currentTarget.pause()}
                         />
-                      ) : project.image ? (
+                      ) : project.images && project.images.length > 0 ? (
                         <img 
-                          src={project.image}
+                          src={project.images[0]}
                           alt={project.title}
                           className="w-full h-auto object-cover group-hover:scale-110 transition duration-500"
                         />

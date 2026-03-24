@@ -3,14 +3,14 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { storage } from '@/lib/storage'
 
 export default function Landing() {
   const [projects, setProjects] = useState<any[]>([])
 
   useEffect(() => {
-    const data = storage.getProjects().slice(0, 6)
-    setProjects(data)
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => setProjects(data.slice(0, 6)))
   }, [])
 
   return (
@@ -83,12 +83,16 @@ export default function Landing() {
             >
               <Link href={`/project/${project.id}`}>
                 <div className="aspect-video relative overflow-hidden bg-gray-900">
-                  {project.image && (
+                  {project.images && project.images.length > 0 ? (
                     <img 
-                      src={project.image} 
+                      src={project.images[0]} 
                       alt={project.title}
                       className="w-full h-full object-cover"
                     />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600">
+                      No image
+                    </div>
                   )}
                 </div>
                 <div className="p-6">

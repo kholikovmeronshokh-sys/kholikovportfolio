@@ -4,18 +4,43 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { storage } from '@/lib/storage'
 
 export default function ProjectDetail() {
   const params = useParams()
   const [project, setProject] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   useEffect(() => {
-    const data = storage.getProject(params.id as string)
-    setProject(data)
-    setLoading(false)
+    fetch(`/api/projects/${params.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setProject(data)
+        setLoading(false)
+      })
   }, [params.id])
+
+  useEffect(() => {
+    if (!project || !project.images || project.images.length <= 1) return
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % project.images.length)
+    }, 3000) // Change image every 3 seconds
+    
+    return () => clearInterval(interval)
+  }, [project])
+
+  const nextImage = () => {
+    if (project && project.images) {
+      setCurrentImageIndex((prev) => (prev + 1) % project.images.length)
+    }
+  }
+
+  const prevImage = () => {
+    if (project && project.images) {
+      setCurrentImageIndex((prev) => (prev - 1 + project.images.length) % project.images.length)
+    }
+  }
 
   if (loading) {
     return (
@@ -73,12 +98,50 @@ export default function ProjectDetail() {
                 controls
                 className="w-full h-auto"
               />
-            ) : project.image ? (
-              <img 
-                src={project.image}
-                alt={project.title}
-                className="w-full h-auto"
-              />
+            ) : project.images && project.images.length > 0 ? (
+              <div className="relative">
+                <img 
+                  src={project.images[currentImageIndex]}
+                  alt={`${project.title} - Image ${currentImageIndex + 1}`}
+                  className="w-full h-auto"
+                />
+                
+                {/* Image Counter */}
+                {project.images.length > 1 && (
+                  <>
+                    <div className="absolute bottom-4 right-4 bg-black/70 px-3 py-1 rounded-full text-sm">
+                      {currentImageIndex + 1} / {project.images.length}
+                    </div>
+                    
+                    {/* Navigation Arrows */}
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 rounded-full flex items-center justify-center transition"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 rounded-full flex items-center justify-center transition"
+                    >
+                      →
+                    </button>
+                    
+                    {/* Dots Indicator */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                      {project.images.map((_: any, index: number) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`w-2 h-2 rounded-full transition ${
+                            index === currentImageIndex ? 'bg-white' : 'bg-white/40'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             ) : (
               <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
                 <span className="text-gray-600 text-6xl">📁</span>

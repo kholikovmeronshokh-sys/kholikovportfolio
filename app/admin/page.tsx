@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { storage } from '@/lib/storage'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -16,7 +15,7 @@ export default function Admin() {
     title: '',
     description: '',
     link: '',
-    image: '',
+    images: [] as string[], // Multiple images (max 6)
     video: ''
   })
 
@@ -28,21 +27,23 @@ export default function Admin() {
     }
   }, [])
 
-  const loadProjects = () => {
-    const data = storage.getProjects()
+  const loadProjects = async () => {
+    const res = await fetch('/api/projects')
+    const data = await res.json()
     setProjects(data)
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
     
-    // Check credentials
-    const validUsername = 'kholikov_admin'
-    const validPassword = 'Meronshokh@2024!Secure'
-    
-    if (username === validUsername && password === validPassword) {
-      const token = 'authenticated_' + Date.now()
-      localStorage.setItem('adminToken', token)
+    if (res.ok) {
+      const data = await res.json()
+      localStorage.setItem('adminToken', data.token)
       setIsAuthenticated(true)
       loadProjects()
     } else {
@@ -55,29 +56,41 @@ export default function Admin() {
     setIsAuthenticated(false)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const token = localStorage.getItem('adminToken')
     
-    if (editingProject) {
-      storage.updateProject(editingProject.id, formData)
-    } else {
-      const newProject = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString()
-      }
-      storage.addProject(newProject)
+    const url = editingProject 
+      ? `/api/projects/${editingProject.id}`
+      : '/api/projects'
+    
+    const method = editingProject ? 'PUT' : 'POST'
+    
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(formData)
+    })
+    
+    if (res.ok) {
+      setFormData({ title: '', description: '', link: '', images: [], video: '' })
+      setShowForm(false)
+      setEditingProject(null)
+      loadProjects()
     }
-    
-    setFormData({ title: '', description: '', link: '', image: '', video: '' })
-    setShowForm(false)
-    setEditingProject(null)
-    loadProjects()
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this project?')) return
-    storage.deleteProject(id)
+    
+    const token = localStorage.getItem('adminToken')
+    await fetch(`/api/projects/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
     loadProjects()
   }
 
@@ -87,21 +100,43 @@ export default function Admin() {
       title: project.title,
       description: project.description,
       link: project.link || '',
-      image: project.image || '',
+      images: project.images || [],
       video: project.video || ''
     })
     setShowForm(true)
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files) return
     
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setFormData(prev => ({ ...prev, image: reader.result as string }))
+    const currentImages = formData.images.length
+    const remainingSlots = 6 - currentImages
+    
+    if (remainingSlots <= 0) {
+      alert('Maximum 6 images allowed')
+      return
     }
-    reader.readAsDataURL(file)
+    
+    const filesToProcess = Array.from(files).slice(0, remainingSlots)
+    
+    filesToProcess.forEach(file => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, reader.result as string]
+        }))
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const removeImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
   }
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,7 +208,7 @@ export default function Admin() {
             onClick={() => {
               setShowForm(!showForm)
               setEditingProject(null)
-              setFormData({ title: '', description: '', link: '', image: '', video: '' })
+              setFormData({ title: '', description: '', link: '', images: [], video: '' })
             }}
             className="btn-primary text-sm sm:text-base whitespace-nowrap"
           >
@@ -215,22 +250,43 @@ export default function Admin() {
                 className="w-full glass rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500"
               />
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Upload Image</label>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Upload Images (Max 6) - {formData.images.length}/6
+                  </label>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleImageUpload}
+                    disabled={formData.images.length >= 6}
                     className="w-full glass rounded-lg px-4 py-3 outline-none"
                   />
-                  {formData.image && (
-                    <img src={formData.image} alt="Preview" className="mt-2 rounded-lg w-full h-32 object-cover" />
+                  {formData.images.length > 0 && (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {formData.images.map((img, index) => (
+                        <div key={index} className="relative group">
+                          <img 
+                            src={img} 
+                            alt={`Preview ${index + 1}`} 
+                            className="rounded-lg w-full h-24 object-cover" 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Upload Video</label>
+                  <label className="block text-sm text-gray-400 mb-2">Upload Video (Optional)</label>
                   <input
                     type="file"
                     accept="video/*"
@@ -255,8 +311,12 @@ export default function Admin() {
           {projects.map((project: any) => (
             <div key={project.id} className="glass rounded-xl overflow-hidden">
               <div className="aspect-video relative bg-gray-900">
-                {project.image && (
-                  <img src={project.image} alt={project.title} className="w-full h-full object-cover" />
+                {project.images && project.images.length > 0 ? (
+                  <img src={project.images[0]} alt={project.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-600">
+                    No image
+                  </div>
                 )}
               </div>
               <div className="p-6">

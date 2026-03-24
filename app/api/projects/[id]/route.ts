@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 
-// Import the shared store from the main route
-// This is a temporary solution - for production use a real database
+// Import from parent to share the same store
 const projectsModule = await import('../route')
 
 function verifyToken(request: NextRequest) {
@@ -18,18 +17,13 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-// Get projects from the parent route's GET handler
-async function getProjects() {
-  const response = await projectsModule.GET()
-  return await response.json()
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const projects = await getProjects()
+    const response = await projectsModule.GET()
+    const projects = await response.json()
     const project = projects.find((p: any) => p.id === params.id)
     
     if (!project) {
@@ -52,16 +46,17 @@ export async function PUT(
   
   try {
     const body = await request.json()
-    const projects = await getProjects()
-    const index = projects.findIndex((p: any) => p.id === params.id)
+    const updateBody = { id: params.id, ...body }
     
-    if (index === -1) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    }
+    const response = await projectsModule.PUT(
+      new NextRequest(request.url, {
+        method: 'PUT',
+        headers: request.headers,
+        body: JSON.stringify(updateBody)
+      })
+    )
     
-    projects[index] = { ...projects[index], ...body }
-    
-    return NextResponse.json(projects[index])
+    return response
   } catch (error) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
@@ -76,10 +71,17 @@ export async function DELETE(
   }
   
   try {
-    const projects = await getProjects()
-    // Filter will be handled by the store
+    const url = new URL(request.url)
+    url.searchParams.set('id', params.id)
     
-    return NextResponse.json({ success: true })
+    const response = await projectsModule.DELETE(
+      new NextRequest(url.toString(), {
+        method: 'DELETE',
+        headers: request.headers
+      })
+    )
+    
+    return response
   } catch (error) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

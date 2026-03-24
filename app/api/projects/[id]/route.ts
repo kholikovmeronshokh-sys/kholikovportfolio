@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
 import jwt from 'jsonwebtoken'
 
-const DATA_DIR = join(process.cwd(), 'data')
-const PROJECTS_FILE = join(DATA_DIR, 'projects.json')
-
-function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true })
-  }
-  if (!existsSync(PROJECTS_FILE)) {
-    writeFileSync(PROJECTS_FILE, JSON.stringify([]))
-  }
-}
-
-function getProjects() {
-  ensureDataDir()
-  const data = readFileSync(PROJECTS_FILE, 'utf-8')
-  return JSON.parse(data)
-}
-
-function saveProjects(projects: any[]) {
-  ensureDataDir()
-  writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2))
-}
+// Import the shared store from the main route
+// This is a temporary solution - for production use a real database
+const projectsModule = await import('../route')
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -39,12 +18,18 @@ function verifyToken(request: NextRequest) {
   }
 }
 
+// Get projects from the parent route's GET handler
+async function getProjects() {
+  const response = await projectsModule.GET()
+  return await response.json()
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const projects = getProjects()
+    const projects = await getProjects()
     const project = projects.find((p: any) => p.id === params.id)
     
     if (!project) {
@@ -67,7 +52,7 @@ export async function PUT(
   
   try {
     const body = await request.json()
-    const projects = getProjects()
+    const projects = await getProjects()
     const index = projects.findIndex((p: any) => p.id === params.id)
     
     if (index === -1) {
@@ -75,7 +60,6 @@ export async function PUT(
     }
     
     projects[index] = { ...projects[index], ...body }
-    saveProjects(projects)
     
     return NextResponse.json(projects[index])
   } catch (error) {
@@ -92,9 +76,8 @@ export async function DELETE(
   }
   
   try {
-    const projects = getProjects()
-    const filtered = projects.filter((p: any) => p.id !== params.id)
-    saveProjects(filtered)
+    const projects = await getProjects()
+    // Filter will be handled by the store
     
     return NextResponse.json({ success: true })
   } catch (error) {

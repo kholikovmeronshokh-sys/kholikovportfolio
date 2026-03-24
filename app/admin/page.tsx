@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { storage } from '@/lib/storage'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -27,23 +28,21 @@ export default function Admin() {
     }
   }, [])
 
-  const loadProjects = async () => {
-    const res = await fetch('/api/projects')
-    const data = await res.json()
+  const loadProjects = () => {
+    const data = storage.getProjects()
     setProjects(data)
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    })
     
-    if (res.ok) {
-      const data = await res.json()
-      localStorage.setItem('adminToken', data.token)
+    // Check credentials
+    const validUsername = 'kholikov_admin'
+    const validPassword = 'Meronshokh@2024!Secure'
+    
+    if (username === validUsername && password === validPassword) {
+      const token = 'authenticated_' + Date.now()
+      localStorage.setItem('adminToken', token)
       setIsAuthenticated(true)
       loadProjects()
     } else {
@@ -56,41 +55,29 @@ export default function Admin() {
     setIsAuthenticated(false)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const token = localStorage.getItem('adminToken')
     
-    const url = editingProject 
-      ? `/api/projects/${editingProject.id}`
-      : '/api/projects'
-    
-    const method = editingProject ? 'PUT' : 'POST'
-    
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(formData)
-    })
-    
-    if (res.ok) {
-      setFormData({ title: '', description: '', link: '', image: '', video: '' })
-      setShowForm(false)
-      setEditingProject(null)
-      loadProjects()
+    if (editingProject) {
+      storage.updateProject(editingProject.id, formData)
+    } else {
+      const newProject = {
+        id: Date.now().toString(),
+        ...formData,
+        createdAt: new Date().toISOString()
+      }
+      storage.addProject(newProject)
     }
+    
+    setFormData({ title: '', description: '', link: '', image: '', video: '' })
+    setShowForm(false)
+    setEditingProject(null)
+    loadProjects()
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm('Delete this project?')) return
-    
-    const token = localStorage.getItem('adminToken')
-    await fetch(`/api/projects/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    storage.deleteProject(id)
     loadProjects()
   }
 
@@ -106,36 +93,26 @@ export default function Admin() {
     setShowForm(true)
   }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    })
-    
-    const data = await res.json()
-    setFormData(prev => ({ ...prev, image: data.url }))
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, image: reader.result as string }))
+    }
+    reader.readAsDataURL(file)
   }
 
-  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    })
-    
-    const data = await res.json()
-    setFormData(prev => ({ ...prev, video: data.url }))
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, video: reader.result as string }))
+    }
+    reader.readAsDataURL(file)
   }
 
   if (!isAuthenticated) {

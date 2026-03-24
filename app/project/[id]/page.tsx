@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { storage } from '@/lib/storage'
 
 export default function ProjectDetail() {
   const params = useParams()
@@ -11,12 +12,9 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/projects/${params.id}`)
-      .then(res => res.json())
-      .then(data => {
-        setProject(data)
-        setLoading(false)
-      })
+    const data = storage.getProject(params.id as string)
+    setProject(data)
+    setLoading(false)
   }, [params.id])
 
   if (loading) {

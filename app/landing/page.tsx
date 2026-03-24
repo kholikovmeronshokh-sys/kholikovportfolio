@@ -3,14 +3,14 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { storage } from '@/lib/storage'
 
 export default function Landing() {
   const [projects, setProjects] = useState([])
 
   useEffect(() => {
-    fetch('/api/projects')
-      .then(res => res.json())
-      .then(data => setProjects(data.slice(0, 6)))
+    const data = storage.getProjects().slice(0, 6)
+    setProjects(data)
   }, [])
 
   return (

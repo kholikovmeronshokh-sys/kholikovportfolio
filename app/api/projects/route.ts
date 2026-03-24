@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
 import jwt from 'jsonwebtoken'
 
-const DATA_DIR = join(process.cwd(), 'data')
-const PROJECTS_FILE = join(DATA_DIR, 'projects.json')
-
-function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true })
-  }
-  if (!existsSync(PROJECTS_FILE)) {
-    writeFileSync(PROJECTS_FILE, JSON.stringify([]))
-  }
-}
-
-function getProjects() {
-  ensureDataDir()
-  const data = readFileSync(PROJECTS_FILE, 'utf-8')
-  return JSON.parse(data)
-}
-
-function saveProjects(projects: any[]) {
-  ensureDataDir()
-  writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2))
-}
+// In-memory storage (will reset on server restart, but works on Vercel)
+// For production, use a database like MongoDB, PostgreSQL, or Vercel KV
+let projectsStore: any[] = []
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -40,12 +19,7 @@ function verifyToken(request: NextRequest) {
 }
 
 export async function GET() {
-  try {
-    const projects = getProjects()
-    return NextResponse.json(projects)
-  } catch (error) {
-    return NextResponse.json([])
-  }
+  return NextResponse.json(projectsStore)
 }
 
 export async function POST(request: NextRequest) {
@@ -55,7 +29,6 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const projects = getProjects()
     
     const newProject = {
       id: Date.now().toString(),
@@ -63,8 +36,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     }
     
-    projects.unshift(newProject)
-    saveProjects(projects)
+    projectsStore.unshift(newProject)
     
     return NextResponse.json(newProject)
   } catch (error) {

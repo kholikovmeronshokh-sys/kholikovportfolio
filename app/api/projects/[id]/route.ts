@@ -6,7 +6,6 @@ const PROJECTS_KEY = 'portfolio:projects'
 // In-memory fallback
 let memoryStore: any[] = []
 
-// Check if Vercel KV is available
 const hasKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
 
 async function getKV() {
@@ -22,11 +21,8 @@ async function getKV() {
 async function getProjects() {
   const kvClient = await getKV()
   if (kvClient) {
-    const projects = await kvClient.get<any[]>(PROJECTS_KEY)
-    console.log('KV projects:', projects?.length || 0)
-    return projects || []
+    return await kvClient.get<any[]>(PROJECTS_KEY) || []
   }
-  console.log('Memory projects:', memoryStore.length)
   return memoryStore
 }
 
@@ -57,18 +53,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('Fetching project:', params.id)
     const projects = await getProjects()
-    console.log('Total projects:', projects.length)
-    
     const project = projects.find((p: any) => p.id === params.id)
     
     if (!project) {
-      console.log('Project not found:', params.id)
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
     
-    console.log('Project found:', project.title, 'Images:', project.images?.length || 0)
     return NextResponse.json(project)
   } catch (error) {
     console.error('GET Error:', error)

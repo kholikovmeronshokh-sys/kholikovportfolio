@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 
 const PROJECTS_KEY = 'portfolio:projects'
 
-// In-memory fallback for development (will reset on server restart)
+// In-memory fallback
 let memoryStore: any[] = []
 
 // Check if Vercel KV is available
@@ -37,12 +37,9 @@ export async function GET() {
     const kvClient = await getKV()
     if (kvClient) {
       const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      console.log('GET: KV projects:', projects.length)
       return NextResponse.json(projects)
-    } else {
-      console.log('GET: Memory projects:', memoryStore.length)
-      return NextResponse.json(memoryStore)
     }
+    return NextResponse.json(memoryStore)
   } catch (error) {
     console.error('GET Error:', error)
     return NextResponse.json(memoryStore)
@@ -60,20 +57,21 @@ export async function POST(request: NextRequest) {
     
     const newProject = {
       id: Date.now().toString(),
-      ...body,
+      title: body.title,
+      description: body.description,
+      category: body.category || '',
+      link: body.link || '',
+      images: body.images || [],
+      video: body.video || '',
       createdAt: new Date().toISOString()
     }
-    
-    console.log('POST: Creating project:', newProject.title, 'Images:', newProject.images?.length || 0)
     
     if (kvClient) {
       const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
       projects.unshift(newProject)
       await kvClient.set(PROJECTS_KEY, projects)
-      console.log('POST: Saved to KV, total:', projects.length)
     } else {
       memoryStore.unshift(newProject)
-      console.log('POST: Saved to memory, total:', memoryStore.length)
     }
     
     return NextResponse.json(newProject)

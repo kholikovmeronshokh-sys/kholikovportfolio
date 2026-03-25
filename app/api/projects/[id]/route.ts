@@ -3,6 +3,9 @@ import jwt from 'jsonwebtoken'
 
 const PROJECTS_KEY = 'portfolio:projects'
 
+// In-memory fallback
+let memoryStore: any[] = []
+
 // Check if Vercel KV is available
 const hasKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
 
@@ -19,11 +22,21 @@ async function getKV() {
 async function getProjects() {
   const kvClient = await getKV()
   if (kvClient) {
-    return await kvClient.get<any[]>(PROJECTS_KEY) || []
+    const projects = await kvClient.get<any[]>(PROJECTS_KEY)
+    console.log('KV projects:', projects?.length || 0)
+    return projects || []
   }
-  // Fallback: call parent route
-  const response = await fetch(new URL('/api/projects', process.env.VERCEL_URL || 'http://localhost:3000'))
-  return await response.json()
+  console.log('Memory projects:', memoryStore.length)
+  return memoryStore
+}
+
+async function saveProjects(projects: any[]) {
+  const kvClient = await getKV()
+  if (kvClient) {
+    await kvClient.set(PROJECTS_KEY, projects)
+  } else {
+    memoryStore = projects
+  }
 }
 
 function verifyToken(request: NextRequest) {
@@ -44,16 +57,21 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log('Fetching project:', params.id)
     const projects = await getProjects()
+    console.log('Total projects:', projects.length)
+    
     const project = projects.find((p: any) => p.id === params.id)
     
     if (!project) {
+      console.log('Project not found:', params.id)
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
     
+    console.log('Project found:', project.title, 'Images:', project.images?.length || 0)
     return NextResponse.json(project)
   } catch (error) {
-    console.error('Storage Error:', error)
+    console.error('GET Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -68,21 +86,18 @@ export async function PUT(
   
   try {
     const body = await request.json()
-    const kvClient = await getKV()
+    const projects = await getProjects()
     
-    if (kvClient) {
-      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      const index = projects.findIndex((p: any) => p.id === params.id)
-      if (index !== -1) {
-        projects[index] = { ...projects[index], ...body }
-        await kvClient.set(PROJECTS_KEY, projects)
-        return NextResponse.json(projects[index])
-      }
+    const index = projects.findIndex((p: any) => p.id === params.id)
+    if (index !== -1) {
+      projects[index] = { ...projects[index], ...body }
+      await saveProjects(projects)
+      return NextResponse.json(projects[index])
     }
     
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   } catch (error) {
-    console.error('Storage Error:', error)
+    console.error('PUT Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -96,17 +111,13 @@ export async function DELETE(
   }
   
   try {
-    const kvClient = await getKV()
-    
-    if (kvClient) {
-      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      const filtered = projects.filter((p: any) => p.id !== params.id)
-      await kvClient.set(PROJECTS_KEY, projects)
-    }
+    const projects = await getProjects()
+    const filtered = projects.filter((p: any) => p.id !== params.id)
+    await saveProjects(filtered)
     
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Storage Error:', error)
+    console.error('DELETE Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

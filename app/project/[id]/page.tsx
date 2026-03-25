@@ -12,24 +12,7 @@ export default function ProjectDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   useEffect(() => {
-    // Try localStorage first
-    const localProjects = localStorage.getItem('portfolio_projects')
-    if (localProjects) {
-      try {
-        const parsed = JSON.parse(localProjects)
-        const found = parsed.find((p: any) => p.id === params.id)
-        if (found) {
-          console.log('Project loaded from localStorage:', found.title)
-          setProject(found)
-          setLoading(false)
-          return
-        }
-      } catch (e) {
-        console.error('Failed to parse local projects:', e)
-      }
-    }
-    
-    // Fallback to API
+    // ONLY load from API - no localStorage
     fetch(`/api/projects/${params.id}`)
       .then(res => res.json())
       .then(data => {

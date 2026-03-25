@@ -30,25 +30,11 @@ export default function Admin() {
   }, [])
 
   const loadProjects = async () => {
-    // Try localStorage first
-    const localProjects = localStorage.getItem('portfolio_projects')
-    if (localProjects) {
-      try {
-        const parsed = JSON.parse(localProjects)
-        setProjects(parsed)
-      } catch (e) {
-        console.error('Failed to parse local projects:', e)
-      }
-    }
-    
-    // Then sync with API (don't override if API is empty)
+    // ONLY load from API - no localStorage
     try {
       const res = await fetch('/api/projects')
       const data = await res.json()
-      if (data && data.length > 0) {
-        setProjects(data)
-        localStorage.setItem('portfolio_projects', JSON.stringify(data))
-      }
+      setProjects(data)
     } catch (error) {
       console.error('Failed to fetch projects:', error)
     }
@@ -77,14 +63,31 @@ export default function Admin() {
     setIsAuthenticated(false)
   }
 
-  const clearAllProjects = () => {
+  const clearAllProjects = async () => {
     if (!confirm('⚠️ WARNING: This will delete ALL projects permanently! Are you absolutely sure?')) return
     if (!confirm('This is your last chance. Delete ALL projects?')) return
     
-    localStorage.removeItem('portfolio_projects')
-    setProjects([])
-    alert('All projects deleted!')
-    console.log('✓ All projects cleared')
+    const token = localStorage.getItem('adminToken')
+    
+    try {
+      // Get all projects
+      const projects = await fetch('/api/projects').then(res => res.json())
+      
+      // Delete each one from API
+      for (const project of projects) {
+        await fetch(`/api/projects/${project.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      }
+      
+      setProjects([])
+      alert('All projects deleted!')
+      console.log('✓ All projects cleared')
+    } catch (error) {
+      console.error('Error clearing projects:', error)
+      alert('Error clearing projects')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,62 +126,42 @@ export default function Admin() {
     })
     
     try {
-      // Save to localStorage first (always works)
-      const localProjects = localStorage.getItem('portfolio_projects')
-      const projects = localProjects ? JSON.parse(localProjects) : []
+      // Save to API (Vercel KV if connected)
+      const url = editingProject 
+        ? `/api/projects/${editingProject.id}`
+        : '/api/projects'
       
-      if (editingProject) {
-        // Update existing
-        const index = projects.findIndex((p: any) => p.id === editingProject.id)
-        if (index >= 0) {
-          projects[index] = dataToSend
-        } else {
-          projects.unshift(dataToSend)
-        }
+      const method = editingProject ? 'PUT' : 'POST'
+      
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(dataToSend)
+      })
+      
+      if (res.ok) {
+        const result = await res.json()
+        console.log('✓ Project saved successfully:', result.id)
+        
+        // Reload from API to sync
+        await loadProjects()
+        
+        setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
+        setShowForm(false)
+        setEditingProject(null)
+        alert('Project saved successfully!')
       } else {
-        // Add new
-        projects.unshift(dataToSend)
+        const error = await res.text()
+        console.error('✗ Save error:', error)
+        alert('Error saving project: ' + error)
       }
-      
-      localStorage.setItem('portfolio_projects', JSON.stringify(projects))
-      setProjects(projects)
-      
-      console.log('✓ Saved to localStorage')
-      
-      // Try to sync with API (optional)
-      try {
-        const url = editingProject 
-          ? `/api/projects/${editingProject.id}`
-          : '/api/projects'
-        
-        const method = editingProject ? 'PUT' : 'POST'
-        
-        const res = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(dataToSend)
-        })
-        
-        if (res.ok) {
-          console.log('✓ Synced with API')
-        } else {
-          console.log('⚠ API sync failed, but localStorage saved')
-        }
-      } catch (apiError) {
-        console.log('⚠ API not available, using localStorage only')
-      }
-      
-      setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
-      setShowForm(false)
-      setEditingProject(null)
-      alert('Project saved successfully!')
       
     } catch (error) {
-      console.error('✗ Save error:', error)
-      alert('Error saving project. Please try again.')
+      console.error('✗ Network error:', error)
+      alert('Network error. Please try again.')
     }
   }
 
@@ -190,35 +173,20 @@ export default function Admin() {
     try {
       console.log('🗑️ Deleting project:', id)
       
-      // 1. Delete from localStorage first
-      const localProjects = localStorage.getItem('portfolio_projects')
-      if (localProjects) {
-        const projects = JSON.parse(localProjects)
-        const filtered = projects.filter((p: any) => p.id !== id)
-        localStorage.setItem('portfolio_projects', JSON.stringify(filtered))
-        console.log('✓ Deleted from localStorage')
+      // Delete from API
+      const res = await fetch(`/api/projects/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      if (res.ok) {
+        console.log('✓ Deleted from API')
+        // Reload from API to sync
+        await loadProjects()
+        alert('Project deleted successfully!')
+      } else {
+        alert('Error deleting project')
       }
-      
-      // 2. Delete from API
-      try {
-        const res = await fetch(`/api/projects/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (res.ok) {
-          console.log('✓ Deleted from API')
-        }
-      } catch (apiError) {
-        console.log('⚠ API delete failed, but localStorage deleted')
-      }
-      
-      // 3. Update UI immediately
-      const updatedProjects = projects.filter((p: any) => p.id !== id)
-      setProjects(updatedProjects)
-      
-      console.log('✓ Project deleted successfully')
-      alert('Project deleted successfully!')
       
     } catch (error) {
       console.error('✗ Delete error:', error)

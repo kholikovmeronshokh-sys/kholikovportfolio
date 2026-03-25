@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
+import fs from 'fs'
+import path from 'path'
 
-const PROJECTS_KEY = 'portfolio:projects'
-
-// In-memory fallback
-let memoryStore: any[] = []
-
-// Check if Vercel KV is available
-const hasKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
-
-async function getKV() {
-  if (!hasKV) return null
-  try {
-    const { kv } = await import('@vercel/kv')
-    return kv
-  } catch {
-    return null
-  }
-}
+const DATA_FILE = path.join(process.cwd(), 'data', 'projects.json')
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -32,17 +18,30 @@ function verifyToken(request: NextRequest) {
   }
 }
 
+function readProjects() {
+  try {
+    const data = fs.readFileSync(DATA_FILE, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return []
+  }
+}
+
+function writeProjects(projects: any[]) {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(projects, null, 2), 'utf-8')
+  } catch (error) {
+    console.error('Write error:', error)
+  }
+}
+
 export async function GET() {
   try {
-    const kvClient = await getKV()
-    if (kvClient) {
-      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      return NextResponse.json(projects)
-    }
-    return NextResponse.json(memoryStore)
+    const projects = readProjects()
+    return NextResponse.json(projects)
   } catch (error) {
     console.error('GET Error:', error)
-    return NextResponse.json(memoryStore)
+    return NextResponse.json([])
   }
 }
 
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const kvClient = await getKV()
+    const projects = readProjects()
     
     const newProject = {
       id: Date.now().toString(),
@@ -66,13 +65,8 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     }
     
-    if (kvClient) {
-      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      projects.unshift(newProject)
-      await kvClient.set(PROJECTS_KEY, projects)
-    } else {
-      memoryStore.unshift(newProject)
-    }
+    projects.unshift(newProject)
+    writeProjects(projects)
     
     return NextResponse.json(newProject)
   } catch (error) {
@@ -89,22 +83,13 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, ...updates } = body
-    const kvClient = await getKV()
+    const projects = readProjects()
     
-    if (kvClient) {
-      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      const index = projects.findIndex((p: any) => p.id === id)
-      if (index !== -1) {
-        projects[index] = { ...projects[index], ...updates }
-        await kvClient.set(PROJECTS_KEY, projects)
-        return NextResponse.json(projects[index])
-      }
-    } else {
-      const index = memoryStore.findIndex((p: any) => p.id === id)
-      if (index !== -1) {
-        memoryStore[index] = { ...memoryStore[index], ...updates }
-        return NextResponse.json(memoryStore[index])
-      }
+    const index = projects.findIndex((p: any) => p.id === id)
+    if (index !== -1) {
+      projects[index] = { ...projects[index], ...updates }
+      writeProjects(projects)
+      return NextResponse.json(projects[index])
     }
     
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -122,15 +107,10 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const kvClient = await getKV()
+    const projects = readProjects()
     
-    if (kvClient) {
-      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
-      const filtered = projects.filter((p: any) => p.id !== id)
-      await kvClient.set(PROJECTS_KEY, filtered)
-    } else {
-      memoryStore = memoryStore.filter((p: any) => p.id !== id)
-    }
+    const filtered = projects.filter((p: any) => p.id !== id)
+    writeProjects(filtered)
     
     return NextResponse.json({ success: true })
   } catch (error) {

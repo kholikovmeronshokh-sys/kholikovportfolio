@@ -16,7 +16,14 @@ export default function ProjectDetail() {
     fetch(`/api/projects/${params.id}`)
       .then(res => res.json())
       .then(data => {
-        console.log('Project loaded from API:', data)
+        console.log('📥 Project loaded from API:', {
+          id: data.id,
+          title: data.title,
+          hasImages: data.images && data.images.length > 0,
+          imageCount: data.images?.length || 0,
+          hasVideo: !!data.video,
+          firstImagePreview: data.images?.[0] ? data.images[0].substring(0, 50) + '...' : 'none'
+        })
         setProject(data)
         setLoading(false)
       })

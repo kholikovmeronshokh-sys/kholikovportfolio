@@ -122,7 +122,8 @@ export default function Admin() {
       mediaType: dataToSend.mediaType,
       imageCount: dataToSend.images.length,
       hasVideo: !!dataToSend.video,
-      isEdit: !!editingProject
+      isEdit: !!editingProject,
+      firstImagePreview: dataToSend.images[0] ? dataToSend.images[0].substring(0, 50) + '...' : 'none'
     })
     
     try {
@@ -144,7 +145,12 @@ export default function Admin() {
       
       if (res.ok) {
         const result = await res.json()
-        console.log('✓ Project saved successfully:', result.id)
+        console.log('✓ Project saved successfully:', {
+          id: result.id,
+          title: result.title,
+          hasImages: result.images && result.images.length > 0,
+          imageCount: result.images?.length || 0
+        })
         
         // Reload from API to sync
         await loadProjects()

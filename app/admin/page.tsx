@@ -16,6 +16,7 @@ export default function Admin() {
     description: '',
     link: '',
     category: '', // New: category field
+    mediaType: 'images' as 'images' | 'video', // New: media type selector
     images: [] as string[], // Multiple images (max 6)
     video: ''
   })
@@ -79,18 +80,32 @@ export default function Admin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (formData.images.length === 0) {
+    // Validate: must have either images or video
+    if (formData.mediaType === 'images' && formData.images.length === 0) {
       alert('Please add at least one image')
+      return
+    }
+    
+    if (formData.mediaType === 'video' && !formData.video) {
+      alert('Please add a video')
       return
     }
     
     const token = localStorage.getItem('adminToken')
     
+    // Prepare data: clear unused media type
+    const dataToSend = {
+      ...formData,
+      images: formData.mediaType === 'images' ? formData.images : [],
+      video: formData.mediaType === 'video' ? formData.video : ''
+    }
+    
     console.log('📤 Submitting project:', {
-      title: formData.title,
-      category: formData.category,
-      imageCount: formData.images.length,
-      totalSize: formData.images.reduce((sum, img) => sum + img.length, 0)
+      title: dataToSend.title,
+      category: dataToSend.category,
+      mediaType: dataToSend.mediaType,
+      imageCount: dataToSend.images.length,
+      hasVideo: !!dataToSend.video
     })
     
     const url = editingProject 
@@ -106,7 +121,7 @@ export default function Admin() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSend)
       })
       
       if (res.ok) {
@@ -128,7 +143,7 @@ export default function Admin() {
         
         localStorage.setItem('portfolio_projects', JSON.stringify(projects))
         
-        setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
+        setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
         setShowForm(false)
         setEditingProject(null)
         await loadProjects()
@@ -162,6 +177,7 @@ export default function Admin() {
       description: project.description,
       link: project.link || '',
       category: project.category || '',
+      mediaType: project.video ? 'video' : 'images',
       images: project.images || [],
       video: project.video || ''
     })
@@ -295,7 +311,7 @@ export default function Admin() {
             onClick={() => {
               setShowForm(!showForm)
               setEditingProject(null)
-              setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
+              setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
             }}
             className="btn-primary text-sm sm:text-base whitespace-nowrap"
           >
@@ -347,7 +363,37 @@ export default function Admin() {
                 className="w-full glass rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500"
               />
               
-              <div className="grid grid-cols-1 gap-4">
+              {/* Media Type Selector */}
+              <div className="space-y-4">
+                <label className="block text-sm text-gray-400 mb-2">Media Type (Choose One)</label>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, mediaType: 'images', video: '' })}
+                    className={`flex-1 py-3 rounded-lg transition ${
+                      formData.mediaType === 'images'
+                        ? 'bg-gradient-to-r from-purple-600 to-green-600 text-white'
+                        : 'glass hover:bg-white/10'
+                    }`}
+                  >
+                    📷 Images (up to 6)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, mediaType: 'video', images: [] })}
+                    className={`flex-1 py-3 rounded-lg transition ${
+                      formData.mediaType === 'video'
+                        ? 'bg-gradient-to-r from-purple-600 to-green-600 text-white'
+                        : 'glass hover:bg-white/10'
+                    }`}
+                  >
+                    🎥 Video
+                  </button>
+                </div>
+              </div>
+              
+              {/* Conditional Media Upload */}
+              {formData.mediaType === 'images' ? (
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">
                     Upload Images (Max 6) - {formData.images.length}/6
@@ -391,9 +437,9 @@ export default function Admin() {
                     </div>
                   )}
                 </div>
-                
+              ) : (
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Upload Video (Optional)</label>
+                  <label className="block text-sm text-gray-400 mb-2">Upload Video</label>
                   <input
                     type="file"
                     accept="video/*"
@@ -401,10 +447,10 @@ export default function Admin() {
                     className="w-full glass rounded-lg px-4 py-3 outline-none"
                   />
                   {formData.video && (
-                    <video src={formData.video} className="mt-2 rounded-lg w-full h-32 object-cover" />
+                    <video src={formData.video} className="mt-2 rounded-lg w-full h-32 object-cover" controls />
                   )}
                 </div>
-              </div>
+              )}
 
               <button type="submit" className="btn-primary w-full">
                 {editingProject ? 'Update Project' : 'Create Project'}

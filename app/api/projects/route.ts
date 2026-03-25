@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 const PROJECTS_KEY = 'portfolio:projects'
 
 // In-memory fallback for development (will reset on server restart)
-export let memoryStore: any[] = []
+let memoryStore: any[] = []
 
 // Check if Vercel KV is available
 const hasKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN

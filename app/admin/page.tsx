@@ -96,68 +96,79 @@ export default function Admin() {
     // Prepare data: clear unused media type
     const dataToSend = {
       ...formData,
+      id: editingProject?.id || Date.now().toString(),
       images: formData.mediaType === 'images' ? formData.images : [],
-      video: formData.mediaType === 'video' ? formData.video : ''
+      video: formData.mediaType === 'video' ? formData.video : '',
+      createdAt: editingProject?.createdAt || new Date().toISOString()
     }
     
     console.log('📤 Submitting project:', {
+      id: dataToSend.id,
       title: dataToSend.title,
       category: dataToSend.category,
       mediaType: dataToSend.mediaType,
       imageCount: dataToSend.images.length,
-      hasVideo: !!dataToSend.video
+      hasVideo: !!dataToSend.video,
+      isEdit: !!editingProject
     })
     
-    const url = editingProject 
-      ? `/api/projects/${editingProject.id}`
-      : '/api/projects'
-    
-    const method = editingProject ? 'PUT' : 'POST'
-    
     try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dataToSend)
-      })
+      // Save to localStorage first (always works)
+      const localProjects = localStorage.getItem('portfolio_projects')
+      const projects = localProjects ? JSON.parse(localProjects) : []
       
-      if (res.ok) {
-        const result = await res.json()
-        console.log('✓ Project saved successfully:', result.id)
-        
-        // Save to localStorage immediately
-        const localProjects = localStorage.getItem('portfolio_projects')
-        const projects = localProjects ? JSON.parse(localProjects) : []
-        
-        if (editingProject) {
-          const index = projects.findIndex((p: any) => p.id === editingProject.id)
-          if (index >= 0) {
-            projects[index] = result
-          } else {
-            projects.unshift(result)
-          }
+      if (editingProject) {
+        // Update existing
+        const index = projects.findIndex((p: any) => p.id === editingProject.id)
+        if (index >= 0) {
+          projects[index] = dataToSend
         } else {
-          projects.unshift(result)
+          projects.unshift(dataToSend)
         }
-        
-        localStorage.setItem('portfolio_projects', JSON.stringify(projects))
-        setProjects(projects)
-        
-        setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
-        setShowForm(false)
-        setEditingProject(null)
-        alert('Project saved successfully!')
       } else {
-        const error = await res.text()
-        console.error('✗ Save error:', error)
-        alert('Error saving project: ' + error)
+        // Add new
+        projects.unshift(dataToSend)
       }
+      
+      localStorage.setItem('portfolio_projects', JSON.stringify(projects))
+      setProjects(projects)
+      
+      console.log('✓ Saved to localStorage')
+      
+      // Try to sync with API (optional)
+      try {
+        const url = editingProject 
+          ? `/api/projects/${editingProject.id}`
+          : '/api/projects'
+        
+        const method = editingProject ? 'PUT' : 'POST'
+        
+        const res = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(dataToSend)
+        })
+        
+        if (res.ok) {
+          console.log('✓ Synced with API')
+        } else {
+          console.log('⚠ API sync failed, but localStorage saved')
+        }
+      } catch (apiError) {
+        console.log('⚠ API not available, using localStorage only')
+      }
+      
+      setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
+      setShowForm(false)
+      setEditingProject(null)
+      alert('Project saved successfully!')
+      
     } catch (error) {
-      console.error('✗ Network error:', error)
-      alert('Network error. Please try again.')
+      console.error('✗ Save error:', error)
+      alert('Error saving project. Please try again.')
     }
   }
 

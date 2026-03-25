@@ -8,6 +8,7 @@ import Masonry from 'react-masonry-css'
 export default function Projects() {
   const [projects, setProjects] = useState<any[]>([])
   const [search, setSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('All')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,10 +20,14 @@ export default function Projects() {
       })
   }, [])
 
-  const filteredProjects = projects.filter((project: any) =>
-    project.title.toLowerCase().includes(search.toLowerCase()) ||
-    project.description.toLowerCase().includes(search.toLowerCase())
-  )
+  const categories = ['All', ...Array.from(new Set(projects.map((p: any) => p.category).filter(Boolean)))]
+
+  const filteredProjects = projects.filter((project: any) => {
+    const matchesSearch = project.title.toLowerCase().includes(search.toLowerCase()) ||
+      project.description.toLowerCase().includes(search.toLowerCase())
+    const matchesCategory = selectedCategory === 'All' || project.category === selectedCategory
+    return matchesSearch && matchesCategory
+  })
 
   const breakpointColumns = {
     default: 4,
@@ -71,6 +76,23 @@ export default function Projects() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full max-w-md glass rounded-lg px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base outline-none focus:ring-2 focus:ring-purple-500 transition"
           />
+          
+          {/* Category Filter */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-lg text-sm transition ${
+                  selectedCategory === category
+                    ? 'bg-gradient-to-r from-purple-600 to-green-600 text-white'
+                    : 'glass hover:bg-white/10'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
         </motion.div>
 
         {/* Projects Grid */}
@@ -122,6 +144,11 @@ export default function Projects() {
                       <h3 className="text-xl font-bold mb-2 group-hover:text-purple-400 transition">
                         {project.title}
                       </h3>
+                      {project.category && (
+                        <span className="inline-block text-xs px-2 py-1 rounded-full bg-purple-600/30 text-purple-300 mb-2">
+                          {project.category}
+                        </span>
+                      )}
                       <p className="text-gray-400 text-sm line-clamp-3">
                         {project.description}
                       </p>

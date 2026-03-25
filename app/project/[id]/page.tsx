@@ -99,11 +99,11 @@ export default function ProjectDetail() {
                 className="w-full h-auto"
               />
             ) : project.images && project.images.length > 0 ? (
-              <div className="relative">
+              <div className="relative bg-gray-900">
                 <img 
                   src={project.images[currentImageIndex]}
                   alt={`${project.title} - Image ${currentImageIndex + 1}`}
-                  className="w-full h-auto"
+                  className="w-full h-auto max-h-[600px] object-contain"
                 />
                 
                 {/* Image Counter */}
@@ -116,13 +116,13 @@ export default function ProjectDetail() {
                     {/* Navigation Arrows */}
                     <button
                       onClick={prevImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 rounded-full flex items-center justify-center transition"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl"
                     >
                       ←
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 rounded-full flex items-center justify-center transition"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl"
                     >
                       →
                     </button>
@@ -151,6 +151,12 @@ export default function ProjectDetail() {
 
           {/* Content */}
           <div className="glass rounded-2xl p-6 sm:p-8">
+            {project.category && (
+              <span className="inline-block text-sm px-3 py-1 rounded-full bg-purple-600/30 text-purple-300 mb-4">
+                {project.category}
+              </span>
+            )}
+            
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 gradient-text">
               {project.title}
             </h1>

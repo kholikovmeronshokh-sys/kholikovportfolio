@@ -97,6 +97,11 @@ export default function Landing() {
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold mb-2">{project.title}</h3>
+                  {project.category && (
+                    <span className="inline-block text-xs px-2 py-1 rounded-full bg-purple-600/30 text-purple-300 mb-2">
+                      {project.category}
+                    </span>
+                  )}
                   <p className="text-gray-400 line-clamp-2">{project.description}</p>
                 </div>
               </Link>

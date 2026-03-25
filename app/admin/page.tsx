@@ -15,6 +15,7 @@ export default function Admin() {
     title: '',
     description: '',
     link: '',
+    category: '', // New: category field
     images: [] as string[], // Multiple images (max 6)
     video: ''
   })
@@ -76,10 +77,12 @@ export default function Admin() {
     })
     
     if (res.ok) {
-      setFormData({ title: '', description: '', link: '', images: [], video: '' })
+      setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
       setShowForm(false)
       setEditingProject(null)
       loadProjects()
+    } else {
+      alert('Error saving project')
     }
   }
 
@@ -100,6 +103,7 @@ export default function Admin() {
       title: project.title,
       description: project.description,
       link: project.link || '',
+      category: project.category || '',
       images: project.images || [],
       video: project.video || ''
     })
@@ -208,7 +212,7 @@ export default function Admin() {
             onClick={() => {
               setShowForm(!showForm)
               setEditingProject(null)
-              setFormData({ title: '', description: '', link: '', images: [], video: '' })
+              setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
             }}
             className="btn-primary text-sm sm:text-base whitespace-nowrap"
           >
@@ -235,6 +239,16 @@ export default function Admin() {
                 className="w-full glass rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500"
                 required
               />
+              
+              <input
+                type="text"
+                placeholder="Category (e.g., Website, Telegram Bot, Mobile App)"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full glass rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500"
+                required
+              />
+              
               <textarea
                 placeholder="Description"
                 value={formData.description}
@@ -320,6 +334,11 @@ export default function Admin() {
                 )}
               </div>
               <div className="p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs px-2 py-1 rounded-full bg-purple-600/30 text-purple-300">
+                    {project.category || 'Uncategorized'}
+                  </span>
+                </div>
                 <h3 className="text-xl font-bold mb-2">{project.title}</h3>
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{project.description}</p>
                 <div className="flex gap-2">

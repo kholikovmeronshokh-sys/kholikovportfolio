@@ -29,9 +29,28 @@ export default function Admin() {
   }, [])
 
   const loadProjects = async () => {
-    const res = await fetch('/api/projects')
-    const data = await res.json()
-    setProjects(data)
+    // Try localStorage first
+    const localProjects = localStorage.getItem('portfolio_projects')
+    if (localProjects) {
+      try {
+        const parsed = JSON.parse(localProjects)
+        setProjects(parsed)
+      } catch (e) {
+        console.error('Failed to parse local projects:', e)
+      }
+    }
+    
+    // Then sync with API
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      if (data && data.length > 0) {
+        setProjects(data)
+        localStorage.setItem('portfolio_projects', JSON.stringify(data))
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+    }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -93,6 +112,22 @@ export default function Admin() {
       if (res.ok) {
         const result = await res.json()
         console.log('✓ Project saved successfully:', result.id)
+        
+        // Save to localStorage immediately
+        const localProjects = localStorage.getItem('portfolio_projects')
+        const projects = localProjects ? JSON.parse(localProjects) : []
+        
+        if (editingProject) {
+          const index = projects.findIndex((p: any) => p.id === editingProject.id)
+          if (index >= 0) {
+            projects[index] = result
+          }
+        } else {
+          projects.unshift(result)
+        }
+        
+        localStorage.setItem('portfolio_projects', JSON.stringify(projects))
+        
         setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
         setShowForm(false)
         setEditingProject(null)

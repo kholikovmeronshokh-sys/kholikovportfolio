@@ -12,10 +12,30 @@ export default function Projects() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Try localStorage first
+    const localProjects = localStorage.getItem('portfolio_projects')
+    if (localProjects) {
+      try {
+        const parsed = JSON.parse(localProjects)
+        setProjects(parsed)
+        setLoading(false)
+      } catch (e) {
+        console.error('Failed to parse local projects:', e)
+      }
+    }
+    
+    // Then fetch from API
     fetch('/api/projects')
       .then(res => res.json())
       .then(data => {
-        setProjects(data)
+        if (data && data.length > 0) {
+          setProjects(data)
+          localStorage.setItem('portfolio_projects', JSON.stringify(data))
+        }
+        setLoading(false)
+      })
+      .catch(error => {
+        console.error('Failed to fetch projects:', error)
         setLoading(false)
       })
   }, [])

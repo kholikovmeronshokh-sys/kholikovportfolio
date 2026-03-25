@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
+import { kv } from '@vercel/kv'
 
-// Vercel KV alternative - using Vercel Postgres or external DB
-// For now, we'll use a simple JSON approach with Vercel Blob or external storage
-// This is a temporary in-memory store that will work across requests in the same instance
-
-let projectsStore: any[] = []
+const PROJECTS_KEY = 'portfolio:projects'
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -21,7 +18,13 @@ function verifyToken(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json(projectsStore)
+  try {
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
+    return NextResponse.json(projects)
+  } catch (error) {
+    console.error('KV Error:', error)
+    return NextResponse.json([])
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -31,6 +34,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
     
     const newProject = {
       id: Date.now().toString(),
@@ -38,10 +42,12 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     }
     
-    projectsStore.unshift(newProject)
+    projects.unshift(newProject)
+    await kv.set(PROJECTS_KEY, projects)
     
     return NextResponse.json(newProject)
   } catch (error) {
+    console.error('KV Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -54,15 +60,18 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, ...updates } = body
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
     
-    const index = projectsStore.findIndex((p: any) => p.id === id)
+    const index = projects.findIndex((p: any) => p.id === id)
     if (index !== -1) {
-      projectsStore[index] = { ...projectsStore[index], ...updates }
-      return NextResponse.json(projectsStore[index])
+      projects[index] = { ...projects[index], ...updates }
+      await kv.set(PROJECTS_KEY, projects)
+      return NextResponse.json(projects[index])
     }
     
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   } catch (error) {
+    console.error('KV Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -75,11 +84,14 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
     
-    projectsStore = projectsStore.filter((p: any) => p.id !== id)
+    const filtered = projects.filter((p: any) => p.id !== id)
+    await kv.set(PROJECTS_KEY, filtered)
     
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error('KV Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

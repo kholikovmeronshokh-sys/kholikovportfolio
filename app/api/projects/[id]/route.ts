@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
+import { kv } from '@vercel/kv'
 
-// Import from parent to share the same store
-const projectsModule = await import('../route')
+const PROJECTS_KEY = 'portfolio:projects'
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -22,8 +22,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const response = await projectsModule.GET()
-    const projects = await response.json()
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
     const project = projects.find((p: any) => p.id === params.id)
     
     if (!project) {
@@ -32,6 +31,7 @@ export async function GET(
     
     return NextResponse.json(project)
   } catch (error) {
+    console.error('KV Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -46,18 +46,18 @@ export async function PUT(
   
   try {
     const body = await request.json()
-    const updateBody = { id: params.id, ...body }
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
     
-    const response = await projectsModule.PUT(
-      new NextRequest(request.url, {
-        method: 'PUT',
-        headers: request.headers,
-        body: JSON.stringify(updateBody)
-      })
-    )
+    const index = projects.findIndex((p: any) => p.id === params.id)
+    if (index !== -1) {
+      projects[index] = { ...projects[index], ...body }
+      await kv.set(PROJECTS_KEY, projects)
+      return NextResponse.json(projects[index])
+    }
     
-    return response
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
   } catch (error) {
+    console.error('KV Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -71,18 +71,13 @@ export async function DELETE(
   }
   
   try {
-    const url = new URL(request.url)
-    url.searchParams.set('id', params.id)
+    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
+    const filtered = projects.filter((p: any) => p.id !== params.id)
+    await kv.set(PROJECTS_KEY, filtered)
     
-    const response = await projectsModule.DELETE(
-      new NextRequest(url.toString(), {
-        method: 'DELETE',
-        headers: request.headers
-      })
-    )
-    
-    return response
+    return NextResponse.json({ success: true })
   } catch (error) {
+    console.error('KV Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

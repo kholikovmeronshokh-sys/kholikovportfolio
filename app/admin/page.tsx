@@ -41,7 +41,7 @@ export default function Admin() {
       }
     }
     
-    // Then sync with API
+    // Then sync with API (don't override if API is empty)
     try {
       const res = await fetch('/api/projects')
       const data = await res.json()
@@ -75,6 +75,16 @@ export default function Admin() {
   const handleLogout = () => {
     localStorage.removeItem('adminToken')
     setIsAuthenticated(false)
+  }
+
+  const clearAllProjects = () => {
+    if (!confirm('⚠️ WARNING: This will delete ALL projects permanently! Are you absolutely sure?')) return
+    if (!confirm('This is your last chance. Delete ALL projects?')) return
+    
+    localStorage.removeItem('portfolio_projects')
+    setProjects([])
+    alert('All projects deleted!')
+    console.log('✓ All projects cleared')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,32 +183,46 @@ export default function Admin() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this project?')) return
+    if (!confirm('Are you sure you want to delete this project? This cannot be undone.')) return
     
     const token = localStorage.getItem('adminToken')
     
     try {
-      // Delete from localStorage first
+      console.log('🗑️ Deleting project:', id)
+      
+      // 1. Delete from localStorage first
       const localProjects = localStorage.getItem('portfolio_projects')
       if (localProjects) {
         const projects = JSON.parse(localProjects)
         const filtered = projects.filter((p: any) => p.id !== id)
         localStorage.setItem('portfolio_projects', JSON.stringify(filtered))
-        setProjects(filtered)
+        console.log('✓ Deleted from localStorage')
       }
       
-      // Also try to delete from API
-      await fetch(`/api/projects/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      // 2. Delete from API
+      try {
+        const res = await fetch(`/api/projects/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        
+        if (res.ok) {
+          console.log('✓ Deleted from API')
+        }
+      } catch (apiError) {
+        console.log('⚠ API delete failed, but localStorage deleted')
+      }
       
-      console.log('✓ Project deleted:', id)
+      // 3. Update UI immediately
+      const updatedProjects = projects.filter((p: any) => p.id !== id)
+      setProjects(updatedProjects)
+      
+      console.log('✓ Project deleted successfully')
       alert('Project deleted successfully!')
+      
     } catch (error) {
-      console.error('Delete error:', error)
-      // Still update UI even if API fails
-      loadProjects()
+      console.error('✗ Delete error:', error)
+      alert('Error deleting project. Please try again.')
     }
   }
 
@@ -341,16 +365,25 @@ export default function Admin() {
       <div className="pt-24 px-4 sm:px-6 max-w-7xl mx-auto pb-12 sm:pb-20">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-12">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold gradient-text">Admin Dashboard</h1>
-          <button
-            onClick={() => {
-              setShowForm(!showForm)
-              setEditingProject(null)
-              setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
-            }}
-            className="btn-primary text-sm sm:text-base whitespace-nowrap"
-          >
-            {showForm ? 'Cancel' : '+ New Project'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={clearAllProjects}
+              className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition text-sm"
+              title="Delete all projects"
+            >
+              🗑️ Clear All
+            </button>
+            <button
+              onClick={() => {
+                setShowForm(!showForm)
+                setEditingProject(null)
+                setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
+              }}
+              className="btn-primary text-sm sm:text-base whitespace-nowrap"
+            >
+              {showForm ? 'Cancel' : '+ New Project'}
+            </button>
+          </div>
         </div>
 
         {/* Form */}

@@ -61,28 +61,39 @@ export default function Admin() {
     e.preventDefault()
     const token = localStorage.getItem('adminToken')
     
+    console.log('Submitting project with', formData.images.length, 'images')
+    
     const url = editingProject 
       ? `/api/projects/${editingProject.id}`
       : '/api/projects'
     
     const method = editingProject ? 'PUT' : 'POST'
     
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(formData)
-    })
-    
-    if (res.ok) {
-      setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
-      setShowForm(false)
-      setEditingProject(null)
-      loadProjects()
-    } else {
-      alert('Error saving project')
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      if (res.ok) {
+        const result = await res.json()
+        console.log('Project saved:', result)
+        setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
+        setShowForm(false)
+        setEditingProject(null)
+        loadProjects()
+      } else {
+        const error = await res.text()
+        console.error('Save error:', error)
+        alert('Error saving project: ' + error)
+      }
+    } catch (error) {
+      console.error('Network error:', error)
+      alert('Network error: ' + error)
     }
   }
 
@@ -124,13 +135,20 @@ export default function Admin() {
     
     const filesToProcess = Array.from(files).slice(0, remainingSlots)
     
-    filesToProcess.forEach(file => {
+    console.log(`Processing ${filesToProcess.length} images...`)
+    
+    filesToProcess.forEach((file, idx) => {
       const reader = new FileReader()
       reader.onloadend = () => {
+        console.log(`Image ${idx + 1} loaded, size: ${(reader.result as string).length} bytes`)
         setFormData(prev => ({
           ...prev,
           images: [...prev.images, reader.result as string]
         }))
+      }
+      reader.onerror = (error) => {
+        console.error(`Error reading image ${idx + 1}:`, error)
+        alert(`Failed to load image ${file.name}`)
       }
       reader.readAsDataURL(file)
     })
@@ -285,6 +303,13 @@ export default function Admin() {
                             src={img} 
                             alt={`Preview ${index + 1}`} 
                             className="rounded-lg w-full h-24 object-cover" 
+                            onError={(e) => {
+                              console.error('Preview image error:', index)
+                              e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="50" text-anchor="middle" fill="%23999" font-size="14">Error</text></svg>'
+                            }}
+                            onLoad={() => {
+                              console.log('Preview loaded:', index)
+                            }}
                           />
                           <button
                             type="button"
@@ -293,6 +318,9 @@ export default function Admin() {
                           >
                             ×
                           </button>
+                          <div className="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-1 rounded">
+                            {index + 1}
+                          </div>
                         </div>
                       ))}
                     </div>

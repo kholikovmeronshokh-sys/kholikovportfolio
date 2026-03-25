@@ -15,7 +15,12 @@ export default function ProjectDetail() {
     fetch(`/api/projects/${params.id}`)
       .then(res => res.json())
       .then(data => {
+        console.log('Project data:', data) // Debug
         setProject(data)
+        setLoading(false)
+      })
+      .catch(error => {
+        console.error('Error loading project:', error)
         setLoading(false)
       })
   }, [params.id])
@@ -99,36 +104,43 @@ export default function ProjectDetail() {
                 className="w-full h-auto"
               />
             ) : project.images && project.images.length > 0 ? (
-              <div className="relative bg-gray-900">
+              <div className="relative bg-gray-900 min-h-[400px] flex items-center justify-center">
                 <img 
                   src={project.images[currentImageIndex]}
                   alt={`${project.title} - Image ${currentImageIndex + 1}`}
                   className="w-full h-auto max-h-[600px] object-contain"
+                  onError={(e) => {
+                    console.error('Image load error:', e)
+                    e.currentTarget.style.display = 'none'
+                  }}
+                  onLoad={(e) => {
+                    console.log('Image loaded successfully')
+                  }}
                 />
                 
                 {/* Image Counter */}
                 {project.images.length > 1 && (
                   <>
-                    <div className="absolute bottom-4 right-4 bg-black/70 px-3 py-1 rounded-full text-sm">
+                    <div className="absolute bottom-4 right-4 bg-black/70 px-3 py-1 rounded-full text-sm z-10">
                       {currentImageIndex + 1} / {project.images.length}
                     </div>
                     
                     {/* Navigation Arrows */}
                     <button
                       onClick={prevImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl z-10"
                     >
                       ←
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl z-10"
                     >
                       →
                     </button>
                     
                     {/* Dots Indicator */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
                       {project.images.map((_: any, index: number) => (
                         <button
                           key={index}
@@ -143,8 +155,9 @@ export default function ProjectDetail() {
                 )}
               </div>
             ) : (
-              <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
-                <span className="text-gray-600 text-6xl">📁</span>
+              <div className="w-full aspect-video flex flex-col items-center justify-center bg-gray-900">
+                <span className="text-gray-600 text-6xl mb-4">📁</span>
+                <p className="text-gray-500">No images available</p>
               </div>
             )}
           </div>

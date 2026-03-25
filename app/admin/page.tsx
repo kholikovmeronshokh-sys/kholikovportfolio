@@ -136,17 +136,19 @@ export default function Admin() {
           const index = projects.findIndex((p: any) => p.id === editingProject.id)
           if (index >= 0) {
             projects[index] = result
+          } else {
+            projects.unshift(result)
           }
         } else {
           projects.unshift(result)
         }
         
         localStorage.setItem('portfolio_projects', JSON.stringify(projects))
+        setProjects(projects)
         
         setFormData({ title: '', description: '', link: '', category: '', mediaType: 'images', images: [], video: '' })
         setShowForm(false)
         setEditingProject(null)
-        await loadProjects()
         alert('Project saved successfully!')
       } else {
         const error = await res.text()
@@ -163,25 +165,46 @@ export default function Admin() {
     if (!confirm('Delete this project?')) return
     
     const token = localStorage.getItem('adminToken')
-    await fetch(`/api/projects/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    loadProjects()
+    
+    try {
+      // Delete from localStorage first
+      const localProjects = localStorage.getItem('portfolio_projects')
+      if (localProjects) {
+        const projects = JSON.parse(localProjects)
+        const filtered = projects.filter((p: any) => p.id !== id)
+        localStorage.setItem('portfolio_projects', JSON.stringify(filtered))
+        setProjects(filtered)
+      }
+      
+      // Also try to delete from API
+      await fetch(`/api/projects/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      console.log('✓ Project deleted:', id)
+      alert('Project deleted successfully!')
+    } catch (error) {
+      console.error('Delete error:', error)
+      // Still update UI even if API fails
+      loadProjects()
+    }
   }
 
   const handleEdit = (project: any) => {
+    console.log('Editing project:', project)
     setEditingProject(project)
     setFormData({
       title: project.title,
       description: project.description,
       link: project.link || '',
       category: project.category || '',
-      mediaType: project.video ? 'video' : 'images',
+      mediaType: (project.video && project.video.length > 0) ? 'video' : 'images',
       images: project.images || [],
       video: project.video || ''
     })
     setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -461,42 +484,59 @@ export default function Admin() {
 
         {/* Projects List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project: any) => (
-            <div key={project.id} className="glass rounded-xl overflow-hidden">
-              <div className="aspect-video relative bg-gray-900">
-                {project.images && project.images.length > 0 ? (
-                  <img src={project.images[0]} alt={project.title} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-600">
-                    No image
-                  </div>
-                )}
-              </div>
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs px-2 py-1 rounded-full bg-purple-600/30 text-purple-300">
-                    {project.category || 'Uncategorized'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-bold mb-2">{project.title}</h3>
-                <p className="text-gray-400 text-sm mb-4 line-clamp-2">{project.description}</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(project)}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(project.id)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
+          {projects.length === 0 ? (
+            <div className="col-span-full text-center py-20">
+              <p className="text-gray-400 text-xl">No projects yet. Create your first project!</p>
             </div>
-          ))}
+          ) : (
+            projects.map((project: any) => (
+              <div key={project.id} className="glass rounded-xl overflow-hidden">
+                <div className="aspect-video relative bg-gray-900">
+                  {project.video ? (
+                    <video src={project.video} className="w-full h-full object-cover" />
+                  ) : project.images && project.images.length > 0 ? (
+                    <img src={project.images[0]} alt={project.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600">
+                      No media
+                    </div>
+                  )}
+                </div>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs px-2 py-1 rounded-full bg-purple-600/30 text-purple-300">
+                      {project.category || 'Uncategorized'}
+                    </span>
+                    {project.video ? (
+                      <span className="text-xs px-2 py-1 rounded-full bg-green-600/30 text-green-300">
+                        🎥 Video
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-600/30 text-blue-300">
+                        📷 {project.images?.length || 0} Images
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">{project.title}</h3>
+                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{project.description}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEdit(project)}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(project.id)}
+                      className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

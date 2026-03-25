@@ -59,9 +59,20 @@ export default function Admin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (formData.images.length === 0) {
+      alert('Please add at least one image')
+      return
+    }
+    
     const token = localStorage.getItem('adminToken')
     
-    console.log('Submitting project with', formData.images.length, 'images')
+    console.log('📤 Submitting project:', {
+      title: formData.title,
+      category: formData.category,
+      imageCount: formData.images.length,
+      totalSize: formData.images.reduce((sum, img) => sum + img.length, 0)
+    })
     
     const url = editingProject 
       ? `/api/projects/${editingProject.id}`
@@ -81,19 +92,20 @@ export default function Admin() {
       
       if (res.ok) {
         const result = await res.json()
-        console.log('Project saved:', result)
+        console.log('✓ Project saved successfully:', result.id)
         setFormData({ title: '', description: '', link: '', category: '', images: [], video: '' })
         setShowForm(false)
         setEditingProject(null)
-        loadProjects()
+        await loadProjects()
+        alert('Project saved successfully!')
       } else {
         const error = await res.text()
-        console.error('Save error:', error)
+        console.error('✗ Save error:', error)
         alert('Error saving project: ' + error)
       }
     } catch (error) {
-      console.error('Network error:', error)
-      alert('Network error: ' + error)
+      console.error('✗ Network error:', error)
+      alert('Network error. Please try again.')
     }
   }
 
@@ -123,7 +135,7 @@ export default function Admin() {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files) return
+    if (!files || files.length === 0) return
     
     const currentImages = formData.images.length
     const remainingSlots = 6 - currentImages
@@ -134,22 +146,40 @@ export default function Admin() {
     }
     
     const filesToProcess = Array.from(files).slice(0, remainingSlots)
+    let processedCount = 0
     
-    console.log(`Processing ${filesToProcess.length} images...`)
+    console.log(`Starting to process ${filesToProcess.length} images...`)
     
     filesToProcess.forEach((file, idx) => {
+      // Check file size (max 2MB per image)
+      if (file.size > 2 * 1024 * 1024) {
+        alert(`Image ${file.name} is too large. Max 2MB per image.`)
+        return
+      }
+      
       const reader = new FileReader()
-      reader.onloadend = () => {
-        console.log(`Image ${idx + 1} loaded, size: ${(reader.result as string).length} bytes`)
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, reader.result as string]
-        }))
+      
+      reader.onload = (event) => {
+        const result = event.target?.result as string
+        if (result) {
+          console.log(`✓ Image ${idx + 1} loaded successfully (${Math.round(result.length / 1024)}KB)`)
+          setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, result]
+          }))
+          processedCount++
+          
+          if (processedCount === filesToProcess.length) {
+            console.log(`All ${processedCount} images loaded!`)
+          }
+        }
       }
+      
       reader.onerror = (error) => {
-        console.error(`Error reading image ${idx + 1}:`, error)
-        alert(`Failed to load image ${file.name}`)
+        console.error(`✗ Error reading image ${idx + 1}:`, error)
+        alert(`Failed to load image: ${file.name}`)
       }
+      
       reader.readAsDataURL(file)
     })
   }

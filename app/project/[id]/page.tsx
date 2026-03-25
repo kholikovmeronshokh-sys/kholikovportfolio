@@ -15,7 +15,7 @@ export default function ProjectDetail() {
     fetch(`/api/projects/${params.id}`)
       .then(res => res.json())
       .then(data => {
-        console.log('Project data:', data) // Debug
+        console.log('Project loaded:', data)
         setProject(data)
         setLoading(false)
       })
@@ -30,7 +30,7 @@ export default function ProjectDetail() {
     
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % project.images.length)
-    }, 3000) // Change image every 3 seconds
+    }, 3000)
     
     return () => clearInterval(interval)
   }, [project])
@@ -95,7 +95,7 @@ export default function ProjectDetail() {
             </button>
           </Link>
 
-          {/* Media */}
+          {/* Media Section */}
           <div className="glass rounded-2xl overflow-hidden mb-8">
             {project.video ? (
               <video 
@@ -104,49 +104,47 @@ export default function ProjectDetail() {
                 className="w-full h-auto"
               />
             ) : project.images && project.images.length > 0 ? (
-              <div className="relative bg-gray-900 min-h-[400px] flex items-center justify-center">
-                <img 
-                  src={project.images[currentImageIndex]}
-                  alt={`${project.title} - Image ${currentImageIndex + 1}`}
-                  className="w-full h-auto max-h-[600px] object-contain"
-                  onError={(e) => {
-                    console.error('Image load error:', e)
-                    e.currentTarget.style.display = 'none'
-                  }}
-                  onLoad={(e) => {
-                    console.log('Image loaded successfully')
-                  }}
-                />
+              <div className="relative bg-gray-900">
+                <div className="w-full min-h-[300px] sm:min-h-[400px] flex items-center justify-center">
+                  <img 
+                    src={project.images[currentImageIndex]}
+                    alt={`${project.title} - ${currentImageIndex + 1}`}
+                    className="w-full h-auto max-h-[600px] object-contain"
+                    style={{ display: 'block' }}
+                  />
+                </div>
                 
-                {/* Image Counter */}
                 {project.images.length > 1 && (
                   <>
-                    <div className="absolute bottom-4 right-4 bg-black/70 px-3 py-1 rounded-full text-sm z-10">
+                    {/* Counter */}
+                    <div className="absolute bottom-4 right-4 bg-black/80 px-3 py-2 rounded-lg text-sm font-medium z-20">
                       {currentImageIndex + 1} / {project.images.length}
                     </div>
                     
-                    {/* Navigation Arrows */}
+                    {/* Left Arrow */}
                     <button
                       onClick={prevImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl z-10"
+                      className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/80 hover:bg-black w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition z-20 text-xl"
                     >
                       ←
                     </button>
+                    
+                    {/* Right Arrow */}
                     <button
                       onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition text-lg sm:text-xl z-10"
+                      className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/80 hover:bg-black w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition z-20 text-xl"
                     >
                       →
                     </button>
                     
-                    {/* Dots Indicator */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                    {/* Dots */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                       {project.images.map((_: any, index: number) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`w-2 h-2 rounded-full transition ${
-                            index === currentImageIndex ? 'bg-white' : 'bg-white/40'
+                          className={`w-2.5 h-2.5 rounded-full transition ${
+                            index === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
                           }`}
                         />
                       ))}
@@ -156,8 +154,8 @@ export default function ProjectDetail() {
               </div>
             ) : (
               <div className="w-full aspect-video flex flex-col items-center justify-center bg-gray-900">
-                <span className="text-gray-600 text-6xl mb-4">📁</span>
-                <p className="text-gray-500">No images available</p>
+                <span className="text-6xl mb-4">📁</span>
+                <p className="text-gray-500 text-lg">No images available</p>
               </div>
             )}
           </div>
@@ -165,16 +163,16 @@ export default function ProjectDetail() {
           {/* Content */}
           <div className="glass rounded-2xl p-6 sm:p-8">
             {project.category && (
-              <span className="inline-block text-sm px-3 py-1 rounded-full bg-purple-600/30 text-purple-300 mb-4">
+              <span className="inline-block text-sm px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600/30 to-green-600/30 text-purple-300 mb-4 border border-purple-500/30">
                 {project.category}
               </span>
             )}
             
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 gradient-text">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 gradient-text">
               {project.title}
             </h1>
             
-            <p className="text-gray-300 text-sm sm:text-base md:text-lg mb-6 sm:mb-8 leading-relaxed whitespace-pre-wrap">
+            <p className="text-gray-300 text-sm sm:text-base md:text-lg mb-8 leading-relaxed whitespace-pre-wrap">
               {project.description}
             </p>
 

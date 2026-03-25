@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
-import { kv } from '@vercel/kv'
 
 const PROJECTS_KEY = 'portfolio:projects'
+
+// In-memory fallback for development (when KV is not available)
+let memoryStore: any[] = []
+
+// Check if Vercel KV is available
+const hasKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+
+async function getKV() {
+  if (!hasKV) return null
+  try {
+    const { kv } = await import('@vercel/kv')
+    return kv
+  } catch {
+    return null
+  }
+}
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -19,11 +34,17 @@ function verifyToken(request: NextRequest) {
 
 export async function GET() {
   try {
-    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
-    return NextResponse.json(projects)
+    const kvClient = await getKV()
+    if (kvClient) {
+      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
+      return NextResponse.json(projects)
+    } else {
+      // Fallback to memory store for development
+      return NextResponse.json(memoryStore)
+    }
   } catch (error) {
-    console.error('KV Error:', error)
-    return NextResponse.json([])
+    console.error('Storage Error:', error)
+    return NextResponse.json(memoryStore)
   }
 }
 
@@ -34,7 +55,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
+    const kvClient = await getKV()
     
     const newProject = {
       id: Date.now().toString(),
@@ -42,12 +63,18 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     }
     
-    projects.unshift(newProject)
-    await kv.set(PROJECTS_KEY, projects)
+    if (kvClient) {
+      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
+      projects.unshift(newProject)
+      await kvClient.set(PROJECTS_KEY, projects)
+    } else {
+      // Fallback to memory store
+      memoryStore.unshift(newProject)
+    }
     
     return NextResponse.json(newProject)
   } catch (error) {
-    console.error('KV Error:', error)
+    console.error('Storage Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -60,18 +87,28 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, ...updates } = body
-    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
+    const kvClient = await getKV()
     
-    const index = projects.findIndex((p: any) => p.id === id)
-    if (index !== -1) {
-      projects[index] = { ...projects[index], ...updates }
-      await kv.set(PROJECTS_KEY, projects)
-      return NextResponse.json(projects[index])
+    if (kvClient) {
+      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
+      const index = projects.findIndex((p: any) => p.id === id)
+      if (index !== -1) {
+        projects[index] = { ...projects[index], ...updates }
+        await kvClient.set(PROJECTS_KEY, projects)
+        return NextResponse.json(projects[index])
+      }
+    } else {
+      // Fallback to memory store
+      const index = memoryStore.findIndex((p: any) => p.id === id)
+      if (index !== -1) {
+        memoryStore[index] = { ...memoryStore[index], ...updates }
+        return NextResponse.json(memoryStore[index])
+      }
     }
     
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   } catch (error) {
-    console.error('KV Error:', error)
+    console.error('Storage Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -84,14 +121,20 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const projects = await kv.get<any[]>(PROJECTS_KEY) || []
+    const kvClient = await getKV()
     
-    const filtered = projects.filter((p: any) => p.id !== id)
-    await kv.set(PROJECTS_KEY, filtered)
+    if (kvClient) {
+      const projects = await kvClient.get<any[]>(PROJECTS_KEY) || []
+      const filtered = projects.filter((p: any) => p.id !== id)
+      await kvClient.set(PROJECTS_KEY, filtered)
+    } else {
+      // Fallback to memory store
+      memoryStore = memoryStore.filter((p: any) => p.id !== id)
+    }
     
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('KV Error:', error)
+    console.error('Storage Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -57,13 +57,13 @@ export const clientStorage = {
   // Get single project
   async getProject(id: string) {
     const projects = await this.getProjects()
-    return projects.find(p => p.id === id)
+    return projects.find((p: any) => p.id === id)
   },
   
   // Delete project
   async deleteProject(id: string, token: string) {
     const projects = this.getLocalProjects()
-    const filtered = projects.filter(p => p.id !== id)
+    const filtered = projects.filter((p: any) => p.id !== id)
     localStorage.setItem('portfolio_projects', JSON.stringify(filtered))
     
     // Also delete from API

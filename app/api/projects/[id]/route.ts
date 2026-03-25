@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
-import fs from 'fs'
-import path from 'path'
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'projects.json')
+const PROJECTS_KEY = 'portfolio:projects'
+
+// Simple in-memory store for development
+let memoryStore: any[] = []
+
+// Try to use Vercel KV if available
+async function getKV() {
+  try {
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      const { kv } = await import('@vercel/kv')
+      return kv
+    }
+  } catch (error) {
+    console.log('KV not available, using memory store')
+  }
+  return null
+}
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -18,29 +32,20 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-function readProjects() {
-  try {
-    const data = fs.readFileSync(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
-}
-
-function writeProjects(projects: any[]) {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(projects, null, 2), 'utf-8')
-  } catch (error) {
-    console.error('Write error:', error)
-  }
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const projects = readProjects()
+    const kvClient = await getKV()
+    let projects: any[] = []
+    
+    if (kvClient) {
+      projects = await kvClient.get(PROJECTS_KEY) || []
+    } else {
+      projects = memoryStore
+    }
+    
     const project = projects.find((p: any) => p.id === params.id)
     
     if (!project) {
@@ -64,13 +69,22 @@ export async function PUT(
   
   try {
     const body = await request.json()
-    const projects = readProjects()
+    const kvClient = await getKV()
     
-    const index = projects.findIndex((p: any) => p.id === params.id)
-    if (index !== -1) {
-      projects[index] = { ...projects[index], ...body }
-      writeProjects(projects)
-      return NextResponse.json(projects[index])
+    if (kvClient) {
+      const projects: any = await kvClient.get(PROJECTS_KEY) || []
+      const index = projects.findIndex((p: any) => p.id === params.id)
+      if (index !== -1) {
+        projects[index] = { ...projects[index], ...body }
+        await kvClient.set(PROJECTS_KEY, projects)
+        return NextResponse.json(projects[index])
+      }
+    } else {
+      const index = memoryStore.findIndex((p: any) => p.id === params.id)
+      if (index !== -1) {
+        memoryStore[index] = { ...memoryStore[index], ...body }
+        return NextResponse.json(memoryStore[index])
+      }
     }
     
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -89,9 +103,15 @@ export async function DELETE(
   }
   
   try {
-    const projects = readProjects()
-    const filtered = projects.filter((p: any) => p.id !== params.id)
-    writeProjects(filtered)
+    const kvClient = await getKV()
+    
+    if (kvClient) {
+      const projects: any = await kvClient.get(PROJECTS_KEY) || []
+      const filtered = projects.filter((p: any) => p.id !== params.id)
+      await kvClient.set(PROJECTS_KEY, filtered)
+    } else {
+      memoryStore = memoryStore.filter((p: any) => p.id !== params.id)
+    }
     
     return NextResponse.json({ success: true })
   } catch (error) {
